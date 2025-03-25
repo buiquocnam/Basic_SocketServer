@@ -1,11 +1,15 @@
-# Sử dụng image Java 21 mới nhất
-FROM eclipse-temurin:21-jdk
+# Sử dụng Java 21 mới nhất (phiên bản slim để giảm dung lượng image)
+FROM eclipse-temurin:21-jdk-slim
 
-# Đặt thư mục làm việc
+# Đặt thư mục làm việc trong container
 WORKDIR /app
 
-# Sao chép toàn bộ project vào container
-COPY . .
+# Sao chép file cấu hình Maven trước để tận dụng cache Docker
+COPY pom.xml .  
+COPY src ./src  
+
+# Đảm bảo quyền thực thi cho mvnw
+RUN chmod +x ./mvnw
 
 # Build project với Maven
 RUN ./mvnw clean package
