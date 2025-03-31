@@ -2,146 +2,272 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kiểm tra WebSocket</title>
+    <title>Chương Trình Xử Lý Số và Chuỗi</title>
+    <!-- CSS Styles -->
     <style>
+        /* Định dạng chung cho trang */
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
             margin: 20px auto;
-            padding: 0 20px;
-        }
-        .container {
-            border: 1px solid #ccc;
             padding: 20px;
-            border-radius: 5px;
+            background-color: #f5f5f5;
         }
-        #messageLog {
-            height: 300px;
+
+        /* Thanh trạng thái kết nối */
+        #status {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+
+        /* Khung hiển thị tin nhắn */
+        #messages {
+            height: 400px;
             overflow-y: auto;
             border: 1px solid #ddd;
-            margin: 10px 0;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: white;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+        }
+
+        /* Vùng nhập liệu */
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Ô nhập liệu */
+        #input {
+            flex: 1;
             padding: 10px;
-            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
         }
-        .message {
-            margin: 5px 0;
-            padding: 5px;
-            border-bottom: 1px solid #eee;
+        #input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
         }
-        .server {
-            color: blue;
-        }
-        .client {
-            color: green;
-        }
-        .error {
-            color: red;
-        }
-        .status {
-            color: gray;
-            font-style: italic;
-        }
+
+        /* Nút gửi */
         button {
             padding: 10px 20px;
-            margin: 5px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
             cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
         }
-        input {
-            padding: 8px;
-            margin: 5px;
-            width: 200px;
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Định dạng tin nhắn */
+        .server-message {
+            color: #0056b3;
+            margin: 8px 0;
+            line-height: 1.4;
+        }
+        .client-message {
+            color: #28a745;
+            margin: 8px 0;
+            font-weight: bold;
+        }
+        .error-message {
+            color: #dc3545;
+            margin: 8px 0;
+            font-weight: bold;
+        }
+
+        /* Tiêu đề */
+        h1 {
+            text-align: center;
+            color: #007bff;
+            margin-bottom: 30px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Kiểm tra WebSocket</h2>
-        <div>
-            <button onclick="connectWebSocket()">Kết nối</button>
-            <button onclick="disconnectWebSocket()">Ngắt kết nối</button>
-        </div>
-        <div>
-            <input type="text" id="messageInput" placeholder="Nhập số 1 để nhận lời chào">
-            <button onclick="sendMessage()">Gửi</button>
-        </div>
-        <div id="messageLog"></div>
+    <h1>Chương Trình Xử Lý Số và Chuỗi</h1>
+
+    <!-- Thanh trạng thái -->
+    <div id="status" class="connecting">Đang kết nối đến máy chủ...</div>
+
+    <!-- Khung hiển thị tin nhắn -->
+    <div id="messages"></div>
+
+    <!-- Vùng nhập và gửi tin nhắn -->
+    <div class="input-container">
+        <input type="text" id="input" placeholder="Nhập lựa chọn hoặc dữ liệu..." disabled>
+        <button onclick="sendMessage()" id="sendButton" disabled>Gửi</button>
     </div>
 
+    <!-- JavaScript -->
     <script>
-        let ws = null;
-        const messageLog = document.getElementById('messageLog');
-        const messageInput = document.getElementById('messageInput');
+        // Biến toàn cục
+        let ws;                           // WebSocket connection
+        let reconnectAttempts = 0;        // Số lần thử kết nối lại
+        const maxReconnectAttempts = 5;   // Số lần thử tối đa
+        const reconnectDelay = 3000;      // Thời gian chờ giữa các lần thử (3 giây)
 
-        function log(message, type) {
-            const div = document.createElement('div');
-            div.className = `message ${type}`;
-            div.textContent = message;
-            messageLog.appendChild(div);
-            messageLog.scrollTop = messageLog.scrollHeight;
-        }
-
-        function connectWebSocket() {
-            if (ws !== null) {
-                log('Đã có kết nối WebSocket!', 'error');
-                return;
-            }
-
+        /**
+         * Kết nối tới WebSocket server
+         */
+        function connect() {
+            // Xác định giao thức (ws hoặc wss) dựa trên HTTPS
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/chat`;
+            const wsUrl = protocol + '//' + window.location.host + '/chat';
+            
+            // Cập nhật trạng thái
+            updateStatus('connecting', 'Đang kết nối đến máy chủ...');
+            
+            // Tạo kết nối WebSocket
             ws = new WebSocket(wsUrl);
 
+            // Xử lý sự kiện kết nối thành công
             ws.onopen = function() {
-                log('Đã kết nối thành công đến máy chủ!', 'status');
+                updateStatus('connected', 'Đã kết nối thành công!');
+                enableInput();
+                reconnectAttempts = 0;
             };
 
+            // Xử lý tin nhắn từ server
             ws.onmessage = function(event) {
-                log('Máy chủ: ' + event.data, 'server');
+                // Định dạng tin nhắn server để hiển thị đẹp hơn
+                let message = event.data;
+                
+                // Thêm dòng trống trước các mục menu để dễ đọc
+                message = message.replace(/(\d\. )/g, '\n$1');
+                
+                appendMessage(message, 'server-message');
             };
 
+            // Xử lý mất kết nối
             ws.onclose = function() {
-                log('Đã ngắt kết nối với máy chủ!', 'status');
-                ws = null;
+                updateStatus('disconnected', '❌ Mất kết nối với máy chủ!');
+                disableInput();
+                handleReconnect();
             };
 
+            // Xử lý lỗi
             ws.onerror = function(error) {
-                log('Lỗi: ' + error.message, 'error');
-                ws = null;
+                appendMessage('⚠️ Lỗi kết nối! Vui lòng kiểm tra kết nối mạng.', 'error-message');
             };
         }
 
-        function disconnectWebSocket() {
-            if (ws === null) {
-                log('Chưa có kết nối WebSocket!', 'error');
-                return;
+        /**
+         * Xử lý việc kết nối lại
+         */
+        function handleReconnect() {
+            if (reconnectAttempts < maxReconnectAttempts) {
+                setTimeout(connect, reconnectDelay);
+                reconnectAttempts++;
+                appendMessage(
+                    '🔄 Đang thử kết nối lại... (Lần ' + reconnectAttempts + '/' + maxReconnectAttempts + ')',
+                    'error-message'
+                );
+            } else {
+                appendMessage('❌ Không thể kết nối lại. Vui lòng tải lại trang.', 'error-message');
             }
-            ws.close();
         }
 
+        /**
+         * Cập nhật trạng thái kết nối
+         */
+        function updateStatus(state, message) {
+            const status = document.getElementById('status');
+            status.className = state;
+            status.textContent = message;
+        }
+
+        /**
+         * Bật các điều khiển nhập liệu
+         */
+        function enableInput() {
+            document.getElementById('input').disabled = false;
+            document.getElementById('sendButton').disabled = false;
+            document.getElementById('input').focus();
+        }
+
+        /**
+         * Tắt các điều khiển nhập liệu
+         */
+        function disableInput() {
+            document.getElementById('input').disabled = true;
+            document.getElementById('sendButton').disabled = true;
+        }
+
+        /**
+         * Thêm tin nhắn vào khung chat
+         */
+        function appendMessage(message, className) {
+            const messages = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = className;
+            messageDiv.textContent = message;
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        /**
+         * Gửi tin nhắn tới server
+         */
         function sendMessage() {
-            if (ws === null) {
-                log('Vui lòng kết nối đến máy chủ trước!', 'error');
-                return;
+            const input = document.getElementById('input');
+            const message = input.value.trim();
+            
+            if (message && ws.readyState === WebSocket.OPEN) {
+                ws.send(message);
+                appendMessage('Bạn: ' + message, 'client-message');
+                input.value = '';
             }
-
-            const message = messageInput.value.trim();
-            if (message === '') {
-                log('Vui lòng nhập tin nhắn!', 'error');
-                return;
-            }
-
-            ws.send(message);
-            log('Client: ' + message, 'client');
-            messageInput.value = '';
         }
 
-        // Cho phép gửi tin nhắn bằng phím Enter
-        messageInput.addEventListener('keypress', function(e) {
+        // Xử lý sự kiện nhấn Enter
+        document.getElementById('input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 sendMessage();
             }
         });
+
+        // Tự động kết nối khi trang được tải
+        connect();
+
+        // Tự động kết nối lại khi cửa sổ được focus
+        window.onfocus = function() {
+            if (ws.readyState === WebSocket.CLOSED) {
+                reconnectAttempts = 0;
+                connect();
+            }
+        };
     </script>
 </body>
 </html> 

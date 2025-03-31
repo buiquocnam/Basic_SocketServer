@@ -1,51 +1,50 @@
 package com.example.socket_server;
 
 import java.io.*;
-import java.net.*;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 
 public class TCPClient {
+    private static final String SERVER_HOST = "localhost";
+    private static final int SERVER_PORT = 8080;
+
     public static void main(String[] args) {
-        // Lấy địa chỉ server từ tham số dòng lệnh hoặc sử dụng localhost
-        String serverAddress = args.length > 0 ? args[0] : "localhost";
-        // Lấy port từ tham số dòng lệnh hoặc sử dụng port mặc định
-        int serverPort = args.length > 1 ? Integer.parseInt(args[1]) : 8080;
-
         try (
-            Socket socket = new Socket(serverAddress, serverPort);
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            Scanner scanner = new Scanner(System.in)
+            Socket socket = new Socket(SERVER_HOST, SERVER_PORT);
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+            PrintWriter out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
+            Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8)
         ) {
-            System.out.println("Đã kết nối đến server: " + serverAddress + ":" + serverPort);
+            System.out.println("Đã kết nối tới server!");
 
-            // Tạo thread riêng để đọc phản hồi từ server
-            Thread serverListener = new Thread(() -> {
+            // Thread để đọc phản hồi từ server
+            Thread readerThread = new Thread(() -> {
                 try {
-                    String serverResponse;
-                    while ((serverResponse = in.readLine()) != null) {
-                        System.out.println("Server: " + serverResponse);
+                    String line;
+                    while ((line = in.readLine()) != null) {
+                        System.out.println(line);
                     }
                 } catch (IOException e) {
                     if (!socket.isClosed()) {
-                        System.err.println("Lỗi kết nối đến server: " + e.getMessage());
+                        System.err.println("Mất kết nối với server: " + e.getMessage());
                     }
                 }
             });
-            serverListener.start();
+            readerThread.setDaemon(true);
+            readerThread.start();
 
             // Vòng lặp chính để đọc input từ người dùng
-            System.out.println("Nhập tin nhắn (gõ 'exit' để thoát):");
-            String userInput;
-            while (!(userInput = scanner.nextLine()).equalsIgnoreCase("exit")) {
-                out.println(userInput);
+            while (true) {
+                String input = scanner.nextLine();
+                if ("exit".equalsIgnoreCase(input.trim())) {
+                    break;
+                }
+                out.println(input);
             }
-            out.println("exit");
 
-        } catch (UnknownHostException e) {
-            System.err.println("Không thể tìm thấy server: " + e.getMessage());
         } catch (IOException e) {
-            System.err.println("Lỗi kết nối đến server: " + e.getMessage());
+            System.err.println("Lỗi kết nối: " + e.getMessage());
         }
     }
 } 

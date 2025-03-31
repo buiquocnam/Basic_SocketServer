@@ -1,5 +1,10 @@
-com\example\socket_server\TCPServer.class
+com\example\socket_server\exercises\StringManipulation$AdvancedOperations.class
 com\example\socket_server\TCPClient.class
-com\example\socket_server\WebSocketServer$1.class
-com\example\socket_server\WebSocketServer$ChatWebSocket.class
 com\example\socket_server\WebSocketServer.class
+com\example\socket_server\exercises\GcdLcm.class
+com\example\socket_server\TCPServer.class
+com\example\socket_server\exercises\DigitOperations.class
+com\example\socket_server\exercises\NumberChecking.class
+com\example\socket_server\exercises\StringManipulation.class
+com\example\socket_server\WebSocketServer$1.class
+com\example\socket_server\exercises\StringManipulation$Analysis.class
