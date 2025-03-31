@@ -1,3 +1,5 @@
 com\example\socket_server\TCPServer.class
 com\example\socket_server\TCPClient.class
+com\example\socket_server\WebSocketServer$1.class
+com\example\socket_server\WebSocketServer$ChatWebSocket.class
 com\example\socket_server\WebSocketServer.class

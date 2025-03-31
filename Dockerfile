@@ -14,8 +14,11 @@ WORKDIR /app
 # Sao chép file JAR từ stage build
 COPY --from=build /app/target/socket-server-0.0.1-SNAPSHOT-jar-with-dependencies.jar app.jar
 
-# Expose cổng TCP
+# Sao chép thư mục public
+COPY --from=build /app/src/main/public /app/public
+
+# Expose port cho WebSocket
 EXPOSE 8080
 
-# Chạy ứng dụng
-CMD ["java", "-cp", "app.jar", "com.example.socket_server.TCPServer"]
+# Chạy ứng dụng WebSocket
+CMD ["java", "-cp", "app.jar", "com.example.socket_server.WebSocketServer"]

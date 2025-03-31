@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiểm tra WebSocket</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .container {
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        #messageLog {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .server {
+            color: blue;
+        }
+        .client {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+        .status {
+            color: gray;
+            font-style: italic;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Kiểm tra WebSocket</h2>
+        <div>
+            <button onclick="connectWebSocket()">Kết nối</button>
+            <button onclick="disconnectWebSocket()">Ngắt kết nối</button>
+        </div>
+        <div>
+            <input type="text" id="messageInput" placeholder="Nhập số 1 để nhận lời chào">
+            <button onclick="sendMessage()">Gửi</button>
+        </div>
+        <div id="messageLog"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        const messageLog = document.getElementById('messageLog');
+        const messageInput = document.getElementById('messageInput');
+
+        function log(message, type) {
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            div.textContent = message;
+            messageLog.appendChild(div);
+            messageLog.scrollTop = messageLog.scrollHeight;
+        }
+
+        function connectWebSocket() {
+            if (ws !== null) {
+                log('Đã có kết nối WebSocket!', 'error');
+                return;
+            }
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/chat`;
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = function() {
+                log('Đã kết nối thành công đến máy chủ!', 'status');
+            };
+
+            ws.onmessage = function(event) {
+                log('Máy chủ: ' + event.data, 'server');
+            };
+
+            ws.onclose = function() {
+                log('Đã ngắt kết nối với máy chủ!', 'status');
+                ws = null;
+            };
+
+            ws.onerror = function(error) {
+                log('Lỗi: ' + error.message, 'error');
+                ws = null;
+            };
+        }
+
+        function disconnectWebSocket() {
+            if (ws === null) {
+                log('Chưa có kết nối WebSocket!', 'error');
+                return;
+            }
+            ws.close();
+        }
+
+        function sendMessage() {
+            if (ws === null) {
+                log('Vui lòng kết nối đến máy chủ trước!', 'error');
+                return;
+            }
+
+            const message = messageInput.value.trim();
+            if (message === '') {
+                log('Vui lòng nhập tin nhắn!', 'error');
+                return;
+            }
+
+            ws.send(message);
+            log('Client: ' + message, 'client');
+            messageInput.value = '';
+        }
+
+        // Cho phép gửi tin nhắn bằng phím Enter
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html> 
