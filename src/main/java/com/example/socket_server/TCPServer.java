@@ -43,33 +43,23 @@ public class TCPServer {
     }
 
     private static void handleClient(Socket clientSocket) {
-        try (
+        try {
             BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true)
-        ) {
-            String welcomeMessage = "Chào mừng! Hãy nhập số 1 để nhận lời chào, hoặc 'exit' để thoát.";
-            out.println(welcomeMessage);
+            PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
 
-            String inputLine;
-            while ((inputLine = in.readLine()) != null) {
-                System.out.println("Nhận từ client: " + inputLine);
-
-                if ("exit".equalsIgnoreCase(inputLine.trim())) {
-                    out.println("Tạm biệt!");
-                    break;
-                }
-
-                try {
-                    int choice = Integer.parseInt(inputLine.trim());
-                    if (choice == 1) {
-                        out.println("Xin chào từ Server!");
-                    } else {
-                        out.println("Lựa chọn không hợp lệ! Vui lòng chọn số 1.");
-                    }
-                } catch (NumberFormatException e) {
-                    out.println("Vui lòng nhập một số nguyên hợp lệ!");
-                }
+            // Đọc dòng đầu tiên để kiểm tra loại request
+            String firstLine = in.readLine();
+            if (firstLine == null) {
+                return;
             }
+
+            // Kiểm tra xem có phải là HTTP request không
+            if (firstLine.contains("HTTP/1.1") || firstLine.contains("HTTP/1.0")) {
+                handleHttpRequest(firstLine, in, out);
+            } else {
+                handleTcpClient(firstLine, in, out);
+            }
+
         } catch (IOException e) {
             System.err.println("Lỗi xử lý client: " + e.getMessage());
         } finally {
@@ -78,6 +68,69 @@ public class TCPServer {
                 System.out.println("Client đã ngắt kết nối: " + clientSocket.getInetAddress());
             } catch (IOException e) {
                 System.err.println("Lỗi đóng kết nối: " + e.getMessage());
+            }
+        }
+    }
+
+    private static void handleHttpRequest(String firstLine, BufferedReader in, PrintWriter out) {
+        // Đọc hết các header HTTP
+        while (true) {
+            try {
+                String line = in.readLine();
+                if (line == null || line.isEmpty()) {
+                    break;
+                }
+            } catch (IOException e) {
+                break;
+            }
+        }
+
+        // Trả về HTTP response đơn giản
+        out.println("HTTP/1.1 200 OK");
+        out.println("Content-Type: text/plain");
+        out.println("Connection: close");
+        out.println();
+        out.println("TCP Socket Server is running!");
+        out.flush();
+    }
+
+    private static void handleTcpClient(String firstLine, BufferedReader in, PrintWriter out) {
+        // Gửi thông báo chào mừng
+        String welcomeMessage = "Chào mừng! Hãy nhập số 1 để nhận lời chào, hoặc 'exit' để thoát.";
+        out.println(welcomeMessage);
+
+        // Xử lý tin nhắn đầu tiên nếu có
+        processMessage(firstLine, out);
+
+        // Xử lý các tin nhắn tiếp theo
+        try {
+            String inputLine;
+            while ((inputLine = in.readLine()) != null) {
+                System.out.println("Nhận từ client: " + inputLine);
+                
+                if ("exit".equalsIgnoreCase(inputLine.trim())) {
+                    out.println("Tạm biệt!");
+                    break;
+                }
+
+                processMessage(inputLine, out);
+            }
+        } catch (IOException e) {
+            System.err.println("Lỗi đọc từ client: " + e.getMessage());
+        }
+    }
+
+    private static void processMessage(String message, PrintWriter out) {
+        try {
+            int choice = Integer.parseInt(message.trim());
+            if (choice == 1) {
+                out.println("Xin chào từ Server!");
+            } else {
+                out.println("Lựa chọn không hợp lệ! Vui lòng chọn số 1.");
+            }
+        } catch (NumberFormatException e) {
+            if (!message.contains("HTTP")) { // Không gửi thông báo lỗi cho HTTP requests
+                out.println("Vui lòng nhập một số nguyên hợp lệ!");
             }
         }
     }
