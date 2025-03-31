@@ -10,8 +10,6 @@ import org.eclipse.jetty.websocket.servlet.WebSocketServlet;
 import org.eclipse.jetty.websocket.servlet.WebSocketServletFactory;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
-import org.eclipse.jetty.rewrite.handler.RewriteHandler;
-import org.eclipse.jetty.rewrite.handler.RedirectRegexRule;
 
 import javax.servlet.DispatcherType;
 import javax.servlet.annotation.WebServlet;
@@ -93,21 +91,8 @@ public class WebSocketServer extends WebSocketServlet {
         connector.setPort(port);
         server.addConnector(connector);
 
-        // Tạo RewriteHandler để xử lý URL
-        RewriteHandler rewriteHandler = new RewriteHandler();
-        rewriteHandler.setRewriteRequestURI(true);
-        rewriteHandler.setRewritePathInfo(true);
-        
-        // Chuyển hướng các URL có nhiều dấu / thành một dấu /
-        RedirectRegexRule redirectRule = new RedirectRegexRule();
-        redirectRule.setRegex("/+");
-        redirectRule.setReplacement("/");
-        rewriteHandler.addRule(redirectRule);
-
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
-        rewriteHandler.setHandler(context);
-        server.setHandler(rewriteHandler);
 
         // Cấu hình CORS
         FilterHolder corsFilter = context.addFilter(CrossOriginFilter.class, "/*", EnumSet.of(DispatcherType.REQUEST));
@@ -116,38 +101,38 @@ public class WebSocketServer extends WebSocketServlet {
         corsFilter.setInitParameter(CrossOriginFilter.ALLOWED_HEADERS_PARAM, "X-Requested-With,Content-Type,Accept,Origin,Sec-WebSocket-Extensions,Sec-WebSocket-Key,Sec-WebSocket-Version");
         corsFilter.setInitParameter(CrossOriginFilter.CHAIN_PREFLIGHT_PARAM, "false");
 
-        // Đặt encoding cho context
+        // Cấu hình UTF-8 cho context
         context.setInitParameter("org.eclipse.jetty.servlet.Default.charEncoding", "UTF-8");
         context.setInitParameter("org.eclipse.jetty.servlet.Default.useFileMappedBuffer", "false");
-        
-        // Thêm WebSocket servlet
-        context.addServlet(new ServletHolder(new WebSocketServer()), "/chat");
 
-        // Thêm servlet cho static files
+        // Thêm WebSocket servlet
+        ServletHolder wsHolder = new ServletHolder("ws-events", new WebSocketServer());
+        context.addServlet(wsHolder, "/chat");
+
+        // Cấu hình static files
         ServletHolder staticHolder = new ServletHolder("default", new org.eclipse.jetty.servlet.DefaultServlet());
         String publicPath = System.getenv("PUBLIC_PATH");
         if (publicPath == null || publicPath.isEmpty()) {
-            // Đường dẫn local development
             publicPath = Paths.get("src/main/public").toAbsolutePath().toString();
         }
         staticHolder.setInitParameter("resourceBase", publicPath);
         staticHolder.setInitParameter("dirAllowed", "true");
-        staticHolder.setInitParameter("pathInfoOnly", "true");
-        staticHolder.setInitParameter("redirectWelcome", "true");
-        staticHolder.setInitParameter("welcomeServings", "true");
         staticHolder.setInitParameter("welcomeFile", "index.html");
         context.addServlet(staticHolder, "/");
 
-        // Thêm health check endpoint
+        // Health check endpoint
         ServletHolder healthHolder = new ServletHolder("health", new org.eclipse.jetty.servlet.DefaultServlet() {
             @Override
-            protected void doGet(javax.servlet.http.HttpServletRequest request, javax.servlet.http.HttpServletResponse response) throws javax.servlet.ServletException, IOException {
+            protected void doGet(javax.servlet.http.HttpServletRequest request, javax.servlet.http.HttpServletResponse response) 
+                throws javax.servlet.ServletException, IOException {
                 response.setCharacterEncoding("UTF-8");
                 response.setContentType("text/plain; charset=UTF-8");
                 response.getWriter().write("Máy chủ đang hoạt động!");
             }
         });
         context.addServlet(healthHolder, "/health");
+
+        server.setHandler(context);
 
         try {
             server.start();
