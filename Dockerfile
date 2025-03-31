@@ -1,18 +1,14 @@
-# Sử dụng Java 21 mới nhất (phiên bản slim để giảm dung lượng image)
-FROM eclipse-temurin:21-jdk-slim
+# Sử dụng OpenJDK 21
+FROM openjdk:21-jdk-slim
 
-# Đặt thư mục làm việc trong container
+# Đặt thư mục làm việc
 WORKDIR /app
 
-# Sao chép file cấu hình Maven trước để tận dụng cache Docker
-COPY pom.xml .  
-COPY src ./src  
+# Sao chép mã nguồn vào container
+COPY . .
 
-# Đảm bảo quyền thực thi cho mvnw
-RUN chmod +x ./mvnw
+# Biên dịch ứng dụng
+RUN javac Server/*.java Client/*.java
 
-# Build project với Maven
-RUN ./mvnw clean package
-
-# Chạy ứng dụng khi container khởi động
-CMD ["java", "-jar", "target/socket-server-1.0-SNAPSHOT.jar"]
+# Chạy server
+CMD ["java", "Server.Server"]
