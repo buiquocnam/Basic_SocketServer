@@ -8,10 +8,15 @@ import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.WebSocketAdapter;
 import org.eclipse.jetty.websocket.servlet.WebSocketServlet;
 import org.eclipse.jetty.websocket.servlet.WebSocketServletFactory;
+import org.eclipse.jetty.servlet.FilterHolder;
+import org.eclipse.jetty.servlets.CrossOriginFilter;
 
+import javax.servlet.DispatcherType;
 import javax.servlet.annotation.WebServlet;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.EnumSet;
+import java.nio.file.Paths;
 
 @WebServlet(name = "WebSocket Chat", urlPatterns = { "/chat" })
 public class WebSocketServer extends WebSocketServlet {
@@ -90,6 +95,13 @@ public class WebSocketServer extends WebSocketServlet {
         context.setContextPath("/");
         server.setHandler(context);
 
+        // Cấu hình CORS
+        FilterHolder corsFilter = context.addFilter(CrossOriginFilter.class, "/*", EnumSet.of(DispatcherType.REQUEST));
+        corsFilter.setInitParameter(CrossOriginFilter.ALLOWED_ORIGINS_PARAM, "*");
+        corsFilter.setInitParameter(CrossOriginFilter.ALLOWED_METHODS_PARAM, "GET,POST,HEAD,OPTIONS");
+        corsFilter.setInitParameter(CrossOriginFilter.ALLOWED_HEADERS_PARAM, "X-Requested-With,Content-Type,Accept,Origin,Sec-WebSocket-Extensions,Sec-WebSocket-Key,Sec-WebSocket-Version");
+        corsFilter.setInitParameter(CrossOriginFilter.CHAIN_PREFLIGHT_PARAM, "false");
+
         // Đặt encoding cho context
         context.setInitParameter("org.eclipse.jetty.servlet.Default.charEncoding", "UTF-8");
         context.setInitParameter("org.eclipse.jetty.servlet.Default.useFileMappedBuffer", "false");
@@ -99,8 +111,14 @@ public class WebSocketServer extends WebSocketServlet {
 
         // Thêm servlet cho static files
         ServletHolder staticHolder = new ServletHolder("default", new org.eclipse.jetty.servlet.DefaultServlet());
-        staticHolder.setInitParameter("resourceBase", "src/main/public");
+        String publicPath = System.getenv("PUBLIC_PATH");
+        if (publicPath == null || publicPath.isEmpty()) {
+            // Đường dẫn local development
+            publicPath = Paths.get("src/main/public").toAbsolutePath().toString();
+        }
+        staticHolder.setInitParameter("resourceBase", publicPath);
         staticHolder.setInitParameter("dirAllowed", "true");
+        staticHolder.setInitParameter("pathInfoOnly", "true");
         context.addServlet(staticHolder, "/");
 
         // Thêm health check endpoint
@@ -118,6 +136,7 @@ public class WebSocketServer extends WebSocketServlet {
             server.start();
             System.out.println("WebSocket Server đang chạy tại ws://localhost:" + port + "/chat");
             System.out.println("Truy cập giao diện web tại http://localhost:" + port);
+            System.out.println("Public path: " + publicPath);
             server.join();
         } catch (Exception e) {
             e.printStackTrace();
