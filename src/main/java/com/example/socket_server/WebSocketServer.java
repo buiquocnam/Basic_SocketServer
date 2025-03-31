@@ -10,6 +10,8 @@ import org.eclipse.jetty.websocket.servlet.WebSocketServlet;
 import org.eclipse.jetty.websocket.servlet.WebSocketServletFactory;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
+import org.eclipse.jetty.rewrite.handler.RewriteHandler;
+import org.eclipse.jetty.rewrite.handler.RedirectRegexRule;
 
 import javax.servlet.DispatcherType;
 import javax.servlet.annotation.WebServlet;
@@ -91,9 +93,21 @@ public class WebSocketServer extends WebSocketServlet {
         connector.setPort(port);
         server.addConnector(connector);
 
+        // Tạo RewriteHandler để xử lý URL
+        RewriteHandler rewriteHandler = new RewriteHandler();
+        rewriteHandler.setRewriteRequestURI(true);
+        rewriteHandler.setRewritePathInfo(true);
+        
+        // Chuyển hướng các URL có nhiều dấu / thành một dấu /
+        RedirectRegexRule redirectRule = new RedirectRegexRule();
+        redirectRule.setRegex("/+");
+        redirectRule.setReplacement("/");
+        rewriteHandler.addRule(redirectRule);
+
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
-        server.setHandler(context);
+        rewriteHandler.setHandler(context);
+        server.setHandler(rewriteHandler);
 
         // Cấu hình CORS
         FilterHolder corsFilter = context.addFilter(CrossOriginFilter.class, "/*", EnumSet.of(DispatcherType.REQUEST));
@@ -119,6 +133,9 @@ public class WebSocketServer extends WebSocketServlet {
         staticHolder.setInitParameter("resourceBase", publicPath);
         staticHolder.setInitParameter("dirAllowed", "true");
         staticHolder.setInitParameter("pathInfoOnly", "true");
+        staticHolder.setInitParameter("redirectWelcome", "true");
+        staticHolder.setInitParameter("welcomeServings", "true");
+        staticHolder.setInitParameter("welcomeFile", "index.html");
         context.addServlet(staticHolder, "/");
 
         // Thêm health check endpoint
